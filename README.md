@@ -1,54 +1,34 @@
-# Forsthaus Korleput — Rooms + Food App (v2)
+# Forsthaus Korleput — Sleep + Food App (v3)
 
-Same app as before, but now with food planning bolted on. Same Supabase project, same Vercel deploy.
+What's new in v3:
+- **"Rooms" → "Sleep"**: now handles house rooms + tents + cars
+- **Drag-and-drop + tap-tap** for guests to move themselves
+- **Plan lock** for host: freeze the plan once it's set
+- **"I'm…" identity** stored in localStorage so guests can only move themselves
+- "Book" tab removed — host enters everyone via Supabase table editor or the optimizer
 
-## What it does
-- **Rooms**: interactive floor plan, per-night booking, optimizer (private vs share, families together)
-- **Food**: diet survey, "what I'm bringing" sign-up, host-defined menu, quantity calculator that subtracts what guests bring
+## Deploying v3 over an existing v2 deploy
 
-## Quick setup (if you've never deployed it)
+1. **Supabase**: paste the new `supabase-schema.sql` into the SQL editor. It's idempotent — safe to re-run. It will add the new `outdoor_spots` and `settings` tables, plus add the `sleep_type` column to `assignments` if missing.
+2. **GitHub**: replace all files with v3 contents. Commit and push.
+3. **Vercel**: auto-redeploys on push. The new `@dnd-kit/core` dependency is added to package.json so it'll be installed automatically.
 
-### 1. Supabase (5 min)
-- New project → SQL Editor → paste `supabase-schema.sql` → Run
-- Settings → API → copy Project URL + anon key
+## How the sleep tab now works
 
-### 2. GitHub
-- New repo → push this folder
+**Guest view (map sub-tab):**
+- Floor plan at top (house rooms)
+- "Outside the house" section below (tents + cars)
+- Mini-cards under each section show occupants as draggable chips
+- Tap the "I'm…" button at the top to claim a name — your name then becomes a blue chip you can grab
+- **Drag your blue chip** to another room/tent/car, OR **tap your chip then tap a destination**
+- Other people's chips are visible but greyed-out (can't move them)
 
-### 3. Vercel
-- Import repo, add env vars before deploy:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- Deploy → share the URL
+**Host view:**
+- All the above + can drag/move anyone
+- New "🔓 lock plan" button — freezes the plan, guests get locked out of edits
+- New "Add an outdoor spot" form — create tents and cars
+- "Run optimizer" still works — only handles house assignments, doesn't touch outdoor people
 
-## How to use food planning (host workflow)
+## When the party is over
 
-1. **Send the link to guests**. They fill in their diet under `food → diet survey` (one entry per person, can update later).
-2. **You build the menu** under `food → menu` (host mode). For each dish, mark which diets it covers (a meat main only covers omni; a green salad covers everyone).
-3. **Guests sign up** to bring dishes under `food → what to bring`. Their items get matched (loosely, by name) to your menu dishes.
-4. **You read off the plan** under `food → plan`. Each dish shows total quantity needed, who's bringing what, and warnings if any diet has no main course.
-
-## How the quantity math works
-
-- Headcount: pulled from the diet survey. If no survey data yet, falls back to defaults (Fri: 22 adults + 12 kids; Sat+Sun: 28 adults + 17 kids — all assumed omnivore).
-- Kids count as 0.6 adult-equivalents (detected by parentheses in the name, e.g. "Lucia (8)").
-- **Mains**: each eater is assigned to the most-restrictive main they can eat (vegan first, then veg, etc.). So if a vegan main and an omni main both exist, vegans go to the vegan one, omnis go to the omni one.
-- **Non-mains** (sides, salads, bread): every eater whose diet is covered gets a full portion.
-- **Bring-items**: matched by string-containment in the dish name. So a guest bringing "potato salad" matches a menu dish called "Potato salad".
-
-## Diet/portion defaults — adjust to taste
-Defaults seeded in `lib/data.ts`:
-- Adult portions (grams per person, edit per dish in the UI):
-  - Main: 200g
-  - Side: 150g
-  - Salad: 80g
-  - Bread: 80g
-  - Dessert: 120g
-- Headcounts per meal: in `lib/data.ts` → `MEAL_DEFAULT_HEADS`
-- Host PIN: `1234` — change in `lib/data.ts` → `HOST_PIN`
-
-## What's NOT in this app (deliberate)
-- Cost tracking / splitting
-- Recipes / cooking instructions
-- Per-meal drink modeling (drinks are one weekend-wide list)
-- Auth (it's a PIN, not a password — fine for a birthday)
+Just delete the Vercel project + Supabase project. Both take 30 sec.

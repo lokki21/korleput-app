@@ -19,8 +19,22 @@ export type Request = {
 export type Assignment = {
   id?: string;
   night: string;
-  room_id: string;
+  room_id: string;          // for sleep_type='house', this is room id like '1','2'...; for tent/car it's the outdoor_spot id
   person_name: string;
+  sleep_type?: 'house' | 'tent' | 'car';
+};
+
+export type OutdoorSpot = {
+  id: string;               // user-chosen slug like "tent_diego"
+  spot_type: 'tent' | 'car';
+  label: string;
+  capacity?: number;
+  notes?: string;
+};
+
+export type Setting = {
+  key: string;
+  value: string;
 };
 
 // ============ FOOD ============

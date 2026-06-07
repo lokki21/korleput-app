@@ -1,17 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, type Request, type Assignment, type Diet, type Dish, type BringItem, type Drink } from '@/lib/supabase';
+import { supabase, type Request, type Assignment, type Diet, type Dish, type BringItem, type Drink, type OutdoorSpot } from '@/lib/supabase';
 import { HOST_PIN, type Night, NIGHTS } from '@/lib/data';
-import { RoomsSection, emptyAssign } from './rooms';
+import { SleepSection, emptyAssign } from './sleep';
 import { FoodSection } from './food';
 import { SectionTabs, PrimaryBtn } from './ui';
 
 type AssignMap = Record<Night, Record<string, string[]>>;
 
 export default function Page() {
-  const [section, setSection] = useState<'rooms' | 'food'>('rooms');
-  const [roomsTab, setRoomsTab] = useState<'map' | 'book' | 'host'>('map');
+  const [section, setSection] = useState<'sleep' | 'food'>('sleep');
+  const [sleepTab, setSleepTab] = useState<'map' | 'host'>('map');
   const [foodTab, setFoodTab] = useState<'diet' | 'bring' | 'menu' | 'plan'>('diet');
 
   // Host PIN
@@ -26,19 +26,23 @@ export default function Page() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [bring, setBring] = useState<BringItem[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
+  const [outdoorSpots, setOutdoorSpots] = useState<OutdoorSpot[]>([]);
+  const [planLocked, setPlanLocked] = useState<boolean>(false);
 
   // UI
   const [toast, setToast] = useState<string | null>(null);
   const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 1800); };
 
   const loadAll = useCallback(async () => {
-    const [reqs, asns, dts, dshs, br, drk] = await Promise.all([
+    const [reqs, asns, dts, dshs, br, drk, ods, sts] = await Promise.all([
       supabase.from('requests').select('*').order('created_at'),
       supabase.from('assignments').select('*'),
       supabase.from('diets').select('*').order('created_at'),
       supabase.from('dishes').select('*').order('created_at'),
       supabase.from('bring_items').select('*').order('created_at'),
       supabase.from('drinks').select('*').order('created_at'),
+      supabase.from('outdoor_spots').select('*').order('created_at'),
+      supabase.from('settings').select('*'),
     ]);
     if (reqs.data) setRequests(reqs.data as Request[]);
     if (asns.data) {
@@ -55,6 +59,11 @@ export default function Page() {
     if (dshs.data) setDishes(dshs.data as Dish[]);
     if (br.data) setBring(br.data as BringItem[]);
     if (drk.data) setDrinks(drk.data as Drink[]);
+    if (ods.data) setOutdoorSpots(ods.data as OutdoorSpot[]);
+    if (sts.data) {
+      const lockedRow = (sts.data as any[]).find(s => s.key === 'plan_locked');
+      setPlanLocked(lockedRow ? lockedRow.value === 'true' : false);
+    }
   }, []);
 
   useEffect(() => {
@@ -66,6 +75,8 @@ export default function Page() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, loadAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bring_items' }, loadAll)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'drinks' }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'outdoor_spots' }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, loadAll)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [loadAll]);
@@ -82,7 +93,7 @@ export default function Page() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 500 }}>Forsthaus Korleput</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)' }}>party logistics · rooms + food</div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)' }}>party logistics · sleep + food</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {!hostUnlocked ? (
@@ -112,15 +123,16 @@ export default function Page() {
 
       <div style={{ marginBottom: 14 }}>
         <SectionTabs value={section} onChange={setSection as any} options={[
-          { v: 'rooms', label: '🛏 rooms' },
+          { v: 'sleep', label: '🛏 sleep' },
           { v: 'food', label: '🍽 food' },
         ]} />
       </div>
 
-      {section === 'rooms' && (
-        <RoomsSection
-          subTab={roomsTab} setSubTab={setRoomsTab}
+      {section === 'sleep' && (
+        <SleepSection
+          subTab={sleepTab} setSubTab={setSleepTab}
           requests={requests} assignments={assignments}
+          outdoorSpots={outdoorSpots} planLocked={planLocked}
           hostUnlocked={hostUnlocked} flash={flash}
         />
       )}

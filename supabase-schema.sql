@@ -17,11 +17,35 @@ create table if not exists assignments (
   night text not null,
   room_id text not null,
   person_name text not null,
+  sleep_type text not null default 'house',  -- house | tent | car
   created_at timestamptz default now()
 );
 
+-- For deployments upgrading from v2: add sleep_type column if missing
+do $$ begin
+  alter table assignments add column if not exists sleep_type text not null default 'house';
+exception when others then null;
+end $$;
+
 create index if not exists assignments_night_idx on assignments(night);
 create index if not exists assignments_room_idx on assignments(room_id);
+
+-- Outdoor sleeping spots (tents, cars). room_id in assignments points here for sleep_type != 'house'
+create table if not exists outdoor_spots (
+  id text primary key,  -- e.g. "tent_diego", "car_marcos_van"
+  spot_type text not null,  -- tent | car
+  label text not null,      -- "Diego's tent", "Marco's van"
+  capacity int default 99,  -- soft cap; tents are basically unlimited
+  notes text,
+  created_at timestamptz default now()
+);
+
+-- Key/value settings (plan_locked, etc.)
+create table if not exists settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz default now()
+);
 
 -- ============ FOOD ============
 
@@ -79,6 +103,8 @@ alter table diets enable row level security;
 alter table dishes enable row level security;
 alter table bring_items enable row level security;
 alter table drinks enable row level security;
+alter table outdoor_spots enable row level security;
+alter table settings enable row level security;
 
 do $$ begin
   create policy "all read requests" on requests for select using (true);
@@ -110,6 +136,15 @@ do $$ begin
   create policy "all insert drinks" on drinks for insert with check (true);
   create policy "all update drinks" on drinks for update using (true);
   create policy "all delete drinks" on drinks for delete using (true);
+
+  create policy "all read outdoor" on outdoor_spots for select using (true);
+  create policy "all insert outdoor" on outdoor_spots for insert with check (true);
+  create policy "all update outdoor" on outdoor_spots for update using (true);
+  create policy "all delete outdoor" on outdoor_spots for delete using (true);
+
+  create policy "all read settings" on settings for select using (true);
+  create policy "all insert settings" on settings for insert with check (true);
+  create policy "all update settings" on settings for update using (true);
 exception when duplicate_object then null;
 end $$;
 
@@ -121,8 +156,14 @@ do $$ begin
   alter publication supabase_realtime add table dishes;
   alter publication supabase_realtime add table bring_items;
   alter publication supabase_realtime add table drinks;
+  alter publication supabase_realtime add table outdoor_spots;
+  alter publication supabase_realtime add table settings;
 exception when duplicate_object then null;
 end $$;
+
+-- Seed default settings
+insert into settings (key, value) values ('plan_locked', 'false')
+on conflict (key) do nothing;
 
 -- ============ SEED DEFAULT MENU ============
 -- Only seeds if dishes table is empty (safe to re-run)
